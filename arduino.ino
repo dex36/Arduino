@@ -1,8 +1,15 @@
 #include <SoftwareSerial.h>
-
+#include <br3ttb-Arduino-PID-Library-fb095d8\PID_v1.h>
 #define DEBUG true
 
 SoftwareSerial esp8266(2, 3);
+
+double Setpoint, Input, Output;
+//Output 0 255
+//
+//
+PID myPID(&Input, &Output, &Setpoint, 2, 5, 1, DIRECT);
+unsigned long serialTime;
 
 void setup()
 {
@@ -18,7 +25,6 @@ void setup()
 	pinMode(10, OUTPUT);
 	digitalWrite(10, LOW);
 	pinMode(5, OUTPUT); /// Speed
-	pinMode(A0, INPUT);
 
 
 	sendCommand("AT+RST\r\n", 2000, DEBUG); // reset module
@@ -30,6 +36,10 @@ void setup()
 	sendCommand("AT+CIPSERVER=1,80\r\n", 1000, DEBUG); // turn on server on port 80
 
 	Serial.println("Server Ready");
+
+	Input = map(analogRead(A0), 0, 1023, 0, 255);
+	Setpoint = 0;
+	myPID.SetMode(AUTOMATIC);
 }
 
 void loop()
@@ -63,24 +73,14 @@ void loop()
 			}
 			Serial.print(pinNumber2);
 			Serial.write("\r\n");
-			analogWrite(5, pinNumber2*2.5);
-			delay(100);
+			//analogWrite(5, pinNumber2*2.5);
+			//delay(100);
 			//jest do 100 a max jest do 255
-			/**
-			for (int speed = 0; speed < pinNumber2; speed++){
-				analogWrite(5, speed);
-				delay(50);
-				//Serial.print(speed);
-				//Serial.write("\r\n");		
-			}	
-			**/
-
-			Serial.print(analogRead(A0));
-			Serial.write("\r\n");
+			//Serial.print(analogRead(A0));
+			//Serial.write("\r\n");
 		    ///////////////////////////////////////////////
-
-
-
+			Setpoint = pinNumber2*2.5;
+			//////////////////////////////////////////////
 
 			String content;
 			content = "Pin ";
@@ -106,6 +106,21 @@ void loop()
 			sendCommand(closeCommand, 100, DEBUG); // close connection
 
 		}
+	}
+	//myPID.SetMode(MANUAL);
+	//myPID.SetControllerDirection(DIRECT);
+	//double p, i, d;    
+	//myPID.SetTunings(p, i, d);
+
+	delay(500);
+	Input = map(analogRead(A0), 0, 1023 , 0, 255);
+	myPID.Compute();
+	analogWrite(5, Output);
+	if (millis()>serialTime)
+	{
+		//SerialReceive();
+		SerialSend();
+		serialTime += 500;
 	}
 }
 
@@ -151,4 +166,30 @@ String sendCommand(String command, const int timeout, boolean debug)
 		Serial.print(response);
 	}
 	return response;
+}
+
+
+
+////////////PID///////////////////////////////////////////
+
+void SerialSend()
+{
+	Serial.print("PID ");
+	Serial.print(Setpoint);
+	Serial.print(" ");
+	Serial.print(Input);
+	Serial.print(" ");
+	Serial.print(Output);
+	Serial.print(" ");
+	Serial.print(myPID.GetKp());
+	Serial.print(" ");
+	Serial.print(myPID.GetKi());
+	Serial.print(" ");
+	Serial.print(myPID.GetKd());
+	Serial.print(" ");
+	if (myPID.GetMode() == AUTOMATIC) Serial.print("Automatic");
+	else Serial.print("Manual");
+	Serial.print(" ");
+	if (myPID.GetDirection() == DIRECT) Serial.println("Direct");
+	else Serial.println("Reverse");
 }
